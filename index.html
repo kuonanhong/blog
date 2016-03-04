@@ -80,6 +80,74 @@
         <div class="col-sm-8 blog-main">
           
   
+    <article id="post-OpenCV-3D-Reconstruction" class="article article-type-post" itemscope itemprop="blogPost">
+
+  <header class="article-header">
+    
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/blog/2016/03/03/OpenCV-3D-Reconstruction/">OpenCV 3D Reconstruction</a>
+    </h1>
+  
+
+
+  </header>
+
+  <div class="article-meta">
+    <div class="article-datetime">
+  <a href="/blog/2016/03/03/OpenCV-3D-Reconstruction/" class="article-date"><time datetime="2016-03-04T03:01:26.000Z" itemprop="datePublished">2016-03-03</time></a>
+</div>
+
+    
+    
+
+  </div>
+  <div class="article-inner">
+
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>A recent 3D reconstruction job requires finding the rays shot from pixels of different cameras. i.e. map a pixel $(u, v)$ to a point in world space $(x, y, z)$. The cameras are calibrated with OpenCV and the parameters are stored in files. This post discussed my experiment with these parameters.</p>
+<h2 id="Decomposition_of_Transformation"><a href="#Decomposition_of_Transformation" class="headerlink" title="Decomposition of Transformation"></a>Decomposition of Transformation</h2><p>According to the definition given by <a href="http://docs.opencv.org/2.4/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html" target="_blank" rel="external">OpenCV site</a>, the intrinsic and extrinsic parameters are given in this form:<br><span>$\mathbf{m&apos;=A[R|t]M&apos;}$</span><!-- Has MathJax --><br>where $m’(u,v,1)$ is the projected pixel; $A$ is the camera matrix; $<a href="/blog/x,y,z">R|t</a>=R\times(x,y,z)+t$ is the transformation matrix given by extrinsic parameters. $M’(x,y,z)$ is the point in world space.<br>Obviously, in order to map a ray from image to world space, we need to do another way around. i.e. compute $M’$ by giving $m’$:<br><span>$M&apos;=[R|t]^{-1}\underbrace{A^{-1}m&apos;}_{\text{ray in model space}}$</span><!-- Has MathJax --><br>First, let’s deal with the ray in model space.<br>Plugin camera matrix (intrinsice paramteres)<br><span>$$\mathbf{A}=\begin{bmatrix}
+f_x &amp; 0 &amp; c_x \\ 
+0 &amp; f_y &amp; c_y\\ 
+0 &amp; 0 &amp; 1
+\end{bmatrix},$$</span><!-- Has MathJax --><br>then we get<br><span>$M&apos;=[R|t]^{-1} (\frac{u-c_x}{f_x}, \frac{v-c_y}{f_y}, 1)^T.$</span><!-- Has MathJax --><br>Also for extrinsic parameters, since<br><span>$[R|t][x,y,z]^T=R\times[x,y,z]^T+t,$</span><!-- Has MathJax --><br>then<br><span>$[R|t]^{-1}[x,y,z]^T=R^{-1}([x,y,z]^T-\mathbf{t})$</span><!-- Has MathJax --><br>While $\mathbf{R}$ is an orthogonal matrix, $\mathbf{R}^{-1}=\mathbf{R}^T$. We can write the transformation matrix in the homogeneous 4 by 4 matrix in the following form:<br><span>$$\mathbf{M_T}=\begin{bmatrix}
+    \mathbf{R}^T &amp; \begin{matrix} -t_x \\ -t_y \\ -t_z\end{matrix} \\
+        \begin{matrix} 0 &amp; 0 &amp; 0 \end{matrix} &amp; 1
+        \end{bmatrix}$$</span><!-- Has MathJax --></p>
+<h2 id="Generating_Ray"><a href="#Generating_Ray" class="headerlink" title="Generating Ray"></a>Generating Ray</h2><p>We define the ray by its starting point and direction in homogenous coordinate in world space. <span>$\mathbf{r}=\mathbf{o}+t*\mathbf{d}$</span><!-- Has MathJax --></p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">struct Ray&#10;&#123;&#10;    glm::vec4 origin;&#10;    glm::vec4 dir;&#10;&#125;;</span><br></pre></td></tr></table></figure>
+<p>Note that the dir is normalized.<br>Thus starting point is the camera position in the world space:<br><span>$origin=\mathbf{M_T}\times[0,0,0,1],$</span><!-- Has MathJax --><br>and direction is calculated by a given pixel $m’(u,v)$:<br><span>$dir=\mathbf{M_T} (\frac{u-c_x}{f_x}, \frac{v-c_y}{f_y}, 1,0)^T$</span><!-- Has MathJax --></p>
+<h2 id="Reconstruction"><a href="#Reconstruction" class="headerlink" title="Reconstruction"></a>Reconstruction</h2><p>Now assume that we have found two correspondent points in two camera images, and have got two rays $\mathbf{r_1}=\mathbf{p_0}+t\mathbf{u}, \mathbf{r_2}=\mathbf{p_1}+t\mathbf{v}$. Since there might be some errors, the two rays are not necessarily collide in space. Therefore, we find a segments $\mathbf{l}$ that perpendicular to both rays, and the treat the midpoint as the reconstructed point. Assume the two ending points of segment $\mathbf{l}$ are $\mathbf{p}=\mathbf{p_0}+t_0\mathbf{u}, \mathbf{q}=\mathbf{p_1}+t_1\mathbf{v}$. We can have $\mathbf{l=p-q}$. Since $\mathbf{l}$ is perpendicular to both lines, we can have the following equations:<br><span>$$\left\{\begin{matrix}
+\mathbf{l\cdot r_1}=0 \\ 
+\mathbf{l\cdot r_2}=0
+\end{matrix}\right.$$</span><!-- Has MathJax --><br>Two equations, two unknown numbers $(t_0, t_1)$. Problem solved.</p>
+
+      
+    </div>
+
+    
+      
+
+    
+
+    <footer class="article-footer">
+      <a data-url="http://v3c70r.github.io/blog/2016/03/03/OpenCV-3D-Reconstruction/" data-id="cild4p7wu000a73skwui4uk0h" class="article-share-link">
+        <i class="fa fa-share"></i> Share
+      </a>
+      
+      
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/blog/tags/opencv/">opencv</a></li></ul>
+
+
+    </footer>
+  </div>
+  
+</article>
+
+
+
+  
     <article id="post-XYZ-TO-EYE" class="article article-type-post" itemscope itemprop="blogPost">
 
   <header class="article-header">
@@ -162,7 +230,7 @@ z_{NDC} = \frac{f+n}{f-n}+\frac{2fn}{f-n}\cdot\frac{w_{view}}{z_{view}}
     
 
     <footer class="article-footer">
-      <a data-url="http://v3c70r.github.io/blog/2015/09/15/XYZ-TO-EYE/" data-id="cijmbez2e0005thskf3lyv1nk" class="article-share-link">
+      <a data-url="http://v3c70r.github.io/blog/2015/09/15/XYZ-TO-EYE/" data-id="cild4p7wr000573skkwadvt4u" class="article-share-link">
         <i class="fa fa-share"></i> Share
       </a>
       
@@ -226,7 +294,7 @@ z_{NDC} = \frac{f+n}{f-n}+\frac{2fn}{f-n}\cdot\frac{w_{view}}{z_{view}}
     
 
     <footer class="article-footer">
-      <a data-url="http://v3c70r.github.io/blog/2015/08/14/CPP-VIRTUAL-FUNC/" data-id="cijmbez1w0000thsk8iq282ic" class="article-share-link">
+      <a data-url="http://v3c70r.github.io/blog/2015/08/14/CPP-VIRTUAL-FUNC/" data-id="cild4p7wy000d73skq7dobe7l" class="article-share-link">
         <i class="fa fa-share"></i> Share
       </a>
       
@@ -267,7 +335,7 @@ z_{NDC} = \frac{f+n}{f-n}+\frac{2fn}{f-n}\cdot\frac{w_{view}}{z_{view}}
   
   <div class="sidebar-module">
     <h4>Tags</h4>
-    <ul class="sidebar-module-list"><li class="sidebar-module-list-item"><a class="sidebar-module-list-link" href="/blog/tags/c/">c++</a><span class="sidebar-module-list-count">1</span></li><li class="sidebar-module-list-item"><a class="sidebar-module-list-link" href="/blog/tags/opengl/">opengl</a><span class="sidebar-module-list-count">1</span></li></ul>
+    <ul class="sidebar-module-list"><li class="sidebar-module-list-item"><a class="sidebar-module-list-link" href="/blog/tags/c/">c++</a><span class="sidebar-module-list-count">1</span></li><li class="sidebar-module-list-item"><a class="sidebar-module-list-link" href="/blog/tags/opencv/">opencv</a><span class="sidebar-module-list-count">1</span></li><li class="sidebar-module-list-item"><a class="sidebar-module-list-link" href="/blog/tags/opengl/">opengl</a><span class="sidebar-module-list-count">1</span></li></ul>
   </div>
 
 
@@ -276,7 +344,7 @@ z_{NDC} = \frac{f+n}{f-n}+\frac{2fn}{f-n}\cdot\frac{w_{view}}{z_{view}}
   <div class="sidebar-module">
     <h4>Tag Cloud</h4>
     <p class="tagcloud">
-      <a href="/blog/tags/c/" style="font-size: 10px;">c++</a> <a href="/blog/tags/opengl/" style="font-size: 10px;">opengl</a>
+      <a href="/blog/tags/c/" style="font-size: 10px;">c++</a> <a href="/blog/tags/opencv/" style="font-size: 10px;">opencv</a> <a href="/blog/tags/opengl/" style="font-size: 10px;">opengl</a>
     </p>
   </div>
 
@@ -284,7 +352,7 @@ z_{NDC} = \frac{f+n}{f-n}+\frac{2fn}{f-n}\cdot\frac{w_{view}}{z_{view}}
   
   <div class="sidebar-module">
     <h4>Archives</h4>
-    <ul class="sidebar-module-list"><li class="sidebar-module-list-item"><a class="sidebar-module-list-link" href="/blog/archives/2015/09/">September 2015</a><span class="sidebar-module-list-count">1</span></li><li class="sidebar-module-list-item"><a class="sidebar-module-list-link" href="/blog/archives/2015/08/">August 2015</a><span class="sidebar-module-list-count">1</span></li></ul>
+    <ul class="sidebar-module-list"><li class="sidebar-module-list-item"><a class="sidebar-module-list-link" href="/blog/archives/2016/03/">March 2016</a><span class="sidebar-module-list-count">1</span></li><li class="sidebar-module-list-item"><a class="sidebar-module-list-link" href="/blog/archives/2015/09/">September 2015</a><span class="sidebar-module-list-count">1</span></li><li class="sidebar-module-list-item"><a class="sidebar-module-list-link" href="/blog/archives/2015/08/">August 2015</a><span class="sidebar-module-list-count">1</span></li></ul>
   </div>
 
 
@@ -293,6 +361,10 @@ z_{NDC} = \frac{f+n}{f-n}+\frac{2fn}{f-n}\cdot\frac{w_{view}}{z_{view}}
   <div class="sidebar-module">
     <h4>Recents</h4>
     <ul class="sidebar-module-list">
+      
+        <li>
+          <a href="/blog/2016/03/03/OpenCV-3D-Reconstruction/">OpenCV 3D Reconstruction</a>
+        </li>
       
         <li>
           <a href="/blog/2015/09/15/XYZ-TO-EYE/">OpenGL Screen Space to View Space</a>
